@@ -26,9 +26,20 @@ while True:
         box = list(map(int, face[:4]))
         cv2.rectangle(frame, box, (0, 0, 255), 2, cv2.LINE_AA)
 
+        # Draw landmarks
+        landmarks = list(map(int, face[4 : len(face) - 1]))
+        landmarks = np.array_split(landmarks, len(landmarks) / 2)
+        for landmark in landmarks:
+            radius = 5
+            thickness = -1
+            cv2.circle(
+                frame, tuple(landmark), radius, (0, 255, 0), thickness, cv2.LINE_AA
+            )
+
     cv2.imshow("frame", frame)
     if cv2.waitKey(1) == ord("q"):
         break
+
 # When everything done, release the capture
 cap.release()
 cv2.destroyAllWindows()
