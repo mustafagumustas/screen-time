@@ -1,6 +1,8 @@
 import cv2
 import dlib
 import numpy as np
+import math
+from PIL import Image
 
 # landmarks locations in their list
 # The mouth can be accessed through points [48, 68].
@@ -17,6 +19,16 @@ predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 
 # Initialize webcam
 cap = cv2.VideoCapture(0)
+
+
+def euclidean_distance(a, b):
+    x1 = a[0]
+    y1 = a[1]
+    x2 = b[0]
+    y2 = b[1]
+
+    return math.sqrt(((x2 - x1) * (x2 - x1)) + ((y2 - y1) * (y2 - y1)))
+
 
 while True:
     # Read a frame from the webcam
@@ -48,17 +60,17 @@ while True:
         # ----------------------
         # find rotation direction
         if left_eye_center[1] > right_eye_center[1]:
-            point_3rd = left_eye_center[0], right_eye_center[1]
+            point_3rd = right_eye_center[0], left_eye_center[1]
             direction = -1  # rotate same direction to clock
             print("rotate to clock direction")
         else:
-            point_3rd = right_eye_center[1], left_eye_center[1]
+            point_3rd = left_eye_center[0], right_eye_center[1]
             direction = 1  # rotate inverse direction of clock
             print("rotate to inverse clock direction")
 
         # ----------------------
 
-        # cv2.circle(frame, point_3rd, 2, (255, 0, 0), 2)
+        cv2.circle(frame, point_3rd, 2, (255, 0, 0), 2)
         # Draw the bounding box and landmarks for the detected face
         cv2.rectangle(
             frame,
@@ -67,11 +79,7 @@ while True:
             (0, 0, 255),
             2,
         )
-        # cv2.line(frame, right_eye_center, left_eye_center, (67, 67, 67), 1)
-        # cv2.line(frame, left_eye_center, point_3rd, (67, 67, 67), 1)
-        # cv2.line(frame, right_eye_center, point_3rd, (67, 67, 67), 1)
         # draw a triangle between eyes and nose centers
-
         cv2.line(
             frame,
             left_eye_center,
@@ -89,8 +97,32 @@ while True:
         # for landmark in landmarks:
         #     cv2.circle(frame, tuple(landmark), 2, (0, 255, 0), -1)
 
-    # Display the frame with bounding boxes and landmarks
-    cv2.imshow("Face Detection", frame)
+        # Display the frame with bounding boxes and landmarks
+        # cv2.circle(img, point_3rd, 2, (255, 0, 0) , 2)
+
+        a = euclidean_distance(left_eye_center, point_3rd)
+        b = euclidean_distance(right_eye_center, point_3rd)
+        c = euclidean_distance(right_eye_center, left_eye_center)
+
+        cos_a = (b * b + c * c - a * a) / (2 * b * c)
+        # print("cos(a) = ", cos_a)
+        angle = np.arccos(cos_a)
+        # print("angle: ", angle," in radian")
+
+        angle = (angle * 180) / math.pi
+        print("angle: ", angle, " in degree")
+
+        if direction == -1:
+            angle = 90 - angle
+
+        print("angle: ", angle, " in degree")
+
+        # --------------------
+        # rotate image
+
+        new_img = Image.fromarray(frame)
+        new_img = np.array(new_img.rotate(direction * angle))
+    cv2.imshow("Face Detection", new_img)
 
     # Exit the loop if 'q' is pressed
     if cv2.waitKey(1) == ord("q"):
