@@ -3,15 +3,7 @@ import dlib
 import numpy as np
 import math
 from PIL import Image
-
-# landmarks locations in their list
-# The mouth can be accessed through points [48, 68].
-# The right eyebrow through points [17, 22].
-# The left eyebrow through points [22, 27].
-# The right eye using [36, 42].
-# The left eye with [42, 48].
-# The nose using [27, 35].
-# And the jaw via [0, 17].
+from face_alignment import face_degree
 
 # Initialize face detector and shape predictor
 detector = dlib.get_frontal_face_detector()
@@ -19,21 +11,13 @@ predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 
 # Initialize webcam
 cap = cv2.VideoCapture(0)
-
-
-def euclidean_distance(a, b):
-    x1 = a[0]
-    y1 = a[1]
-    x2 = b[0]
-    y2 = b[1]
-
-    return math.sqrt(((x2 - x1) * (x2 - x1)) + ((y2 - y1) * (y2 - y1)))
-
+cap.set(cv2.CAP_PROP_FPS, 30)
 
 while True:
     # Read a frame from the webcam
     ret, frame = cap.read()
     frame = cv2.flip(frame, 1)
+
     # Convert frame to grayscale
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -48,81 +32,44 @@ while True:
         # Convert the landmarks to a NumPy array
         landmarks = np.array([[p.x, p.y] for p in landmarks.parts()])
 
-        # because we flip the frame left and right also flipped
-        right_eye = landmarks[42:48]
-        left_eye = landmarks[36:42]
-        nose = landmarks[27:35]
-
-        left_eye_center = np.mean(left_eye, axis=0).astype(int)
-        right_eye_center = np.mean(right_eye, axis=0).astype(int)
-        nose_center = np.mean(nose, axis=0).astype(int)
-
-        # ----------------------
-        # find rotation direction
-        if left_eye_center[1] > right_eye_center[1]:
-            point_3rd = right_eye_center[0], left_eye_center[1]
-            direction = -1  # rotate same direction to clock
-            print("rotate to clock direction")
-        else:
-            point_3rd = left_eye_center[0], right_eye_center[1]
-            direction = 1  # rotate inverse direction of clock
-            print("rotate to inverse clock direction")
-
-        # ----------------------
-
-        cv2.circle(frame, point_3rd, 2, (255, 0, 0), 2)
         # Draw the bounding box and landmarks for the detected face
-        cv2.rectangle(
-            frame,
-            (face.left(), face.top()),
-            (face.right(), face.bottom()),
-            (0, 0, 255),
-            2,
-        )
-        # draw a triangle between eyes and nose centers
-        cv2.line(
-            frame,
-            left_eye_center,
-            right_eye_center,
-            (0, 255, 0),
-            thickness=3,
-            lineType=8,
-        )
-        cv2.line(
-            frame, left_eye_center, nose_center, (0, 255, 0), thickness=3, lineType=8
-        )
-        cv2.line(
-            frame, right_eye_center, nose_center, (0, 255, 0), thickness=3, lineType=8
-        )
-        # for landmark in landmarks:
-        #     cv2.circle(frame, tuple(landmark), 2, (0, 255, 0), -1)
+        for landmark in landmarks:
+            cv2.circle(frame, tuple(landmark), 2, (0, 255, 0), -1)
 
-        # Display the frame with bounding boxes and landmarks
-        # cv2.circle(img, point_3rd, 2, (255, 0, 0) , 2)
+        # Rotate the frame to align the face horizontally
+        rotated_frame, angle = face_degree(frame, landmarks)
 
-        a = euclidean_distance(left_eye_center, point_3rd)
-        b = euclidean_distance(right_eye_center, point_3rd)
-        c = euclidean_distance(right_eye_center, left_eye_center)
+        # Convert the rotated frame to grayscale
+        rotated_gray = cv2.cvtColor(rotated_frame, cv2.COLOR_BGR2GRAY)
 
-        cos_a = (b * b + c * c - a * a) / (2 * b * c)
-        # print("cos(a) = ", cos_a)
-        angle = np.arccos(cos_a)
-        # print("angle: ", angle," in radian")
+        # Detect faces in the rotated grayscale frame
+        faces_rotated = detector(rotated_gray)
 
-        angle = (angle * 180) / math.pi
-        print("angle: ", angle, " in degree")
+        # Loop over the detected faces in the rotated frame
+        for face_rotated in faces_rotated:
+            # Get the landmarks for the rotated face
+            landmarks_rotated = predictor(rotated_gray, face_rotated)
 
-        if direction == -1:
-            angle = 90 - angle
+            # Convert the landmarks to a NumPy array
+            landmarks_rotated = np.array(
+                [[p.x, p.y] for p in landmarks_rotated.parts()]
+            )
 
-        print("angle: ", angle, " in degree")
+            # Draw the landmarks on the rotated frame
+            for landmark in landmarks_rotated:
+                cv2.circle(rotated_frame, tuple(landmark), 2, (0, 255, 0), -1)
 
-        # --------------------
-        # rotate image
+            # Draw the bounding box for the detected face
+            cv2.rectangle(
+                rotated_frame,
+                (face_rotated.left(), face_rotated.top()),
+                (face_rotated.right(), face_rotated.bottom()),
+                (0, 0, 255),
+                2,
+            )
 
-        new_img = Image.fromarray(frame)
-        new_img = np.array(new_img.rotate(direction * angle))
-    cv2.imshow("Face Detection", new_img)
+        # Display the rotated frame
+        cv2.imshow("Rotated Frame", rotated_frame)
 
     # Exit the loop if 'q' is pressed
     if cv2.waitKey(1) == ord("q"):
@@ -130,4 +77,3 @@ while True:
 
 # Release the webcam and destroy all windows
 cap.release()
-cv2.destroyAllWindows()
