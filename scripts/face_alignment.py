@@ -78,3 +78,4 @@ def face_degree(frame, landmarks):
     new_img = Image.fromarray(frame)
     new_img = np.array(new_img.rotate(direction * angle))
     cv2.imshow("Face Detection", new_img)
+    return new_img

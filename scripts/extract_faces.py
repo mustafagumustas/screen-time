@@ -13,19 +13,26 @@ predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FPS, 30)
 
+# Create window
+cv2.namedWindow("Face detection and alignment", cv2.WINDOW_NORMAL)
+
 while True:
     # Read a frame from the webcam
     ret, frame = cap.read()
     frame = cv2.flip(frame, 1)
-
     # Convert frame to grayscale
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     # Detect faces in the grayscale frame
     faces = detector(gray)
 
-    # Loop over the detected faces
-    for face in faces:
+    # Display the original frame if no faces are detected
+    if len(faces) == 0:
+        cv2.imshow("Face detection and alignment", frame)
+    else:
+        # Get the first face in the frame
+        face = faces[0]
+
         # Get the landmarks for the face in this frame
         landmarks = predictor(gray, face)
 
@@ -36,44 +43,19 @@ while True:
         for landmark in landmarks:
             cv2.circle(frame, tuple(landmark), 2, (0, 255, 0), -1)
 
-        # Rotate the frame to align the face horizontally
-        rotated_frame, angle = face_degree(frame, landmarks)
+        # Calculate the rotation degree and rotate the image accouring to that
+        rotated_frame = face_degree(frame, landmarks)
 
-        # Convert the rotated frame to grayscale
-        rotated_gray = cv2.cvtColor(rotated_frame, cv2.COLOR_BGR2GRAY)
-
-        # Detect faces in the rotated grayscale frame
-        faces_rotated = detector(rotated_gray)
-
-        # Loop over the detected faces in the rotated frame
-        for face_rotated in faces_rotated:
-            # Get the landmarks for the rotated face
-            landmarks_rotated = predictor(rotated_gray, face_rotated)
-
-            # Convert the landmarks to a NumPy array
-            landmarks_rotated = np.array(
-                [[p.x, p.y] for p in landmarks_rotated.parts()]
-            )
-
-            # Draw the landmarks on the rotated frame
-            for landmark in landmarks_rotated:
-                cv2.circle(rotated_frame, tuple(landmark), 2, (0, 255, 0), -1)
-
-            # Draw the bounding box for the detected face
-            cv2.rectangle(
-                rotated_frame,
-                (face_rotated.left(), face_rotated.top()),
-                (face_rotated.right(), face_rotated.bottom()),
-                (0, 0, 255),
-                2,
-            )
-
-        # Display the rotated frame
-        cv2.imshow("Rotated Frame", rotated_frame)
+        # Zoom into the face and display it in the window
+        x, y, w, h = face.left(), face.top(), face.width(), face.height()
+        zoomed_face = rotated_frame[y : y + h, x : x + w]
+        zoomed_face = cv2.resize(zoomed_face, (500, 500))
+        cv2.imshow("Face detection and alignment", zoomed_face)
 
     # Exit the loop if 'q' is pressed
     if cv2.waitKey(1) == ord("q"):
         break
 
-# Release the webcam and destroy all windows
+# Release the webcam and destroy the window
 cap.release()
+cv2.destroyAllWindows()
