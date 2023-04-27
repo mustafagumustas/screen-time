@@ -3,59 +3,52 @@ import dlib
 import numpy as np
 import math
 from PIL import Image
-from face_alignment import face_degree
+from face_tools import face_degree, save_frame
 
-# Initialize face detector and shape predictor
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 
-# Initialize webcam
 cap = cv2.VideoCapture(0)
-cap.set(cv2.CAP_PROP_FPS, 30)
-
-# Create window
-cv2.namedWindow("Face detection and alignment", cv2.WINDOW_NORMAL)
 
 while True:
-    # Read a frame from the webcam
     ret, frame = cap.read()
-    frame = cv2.flip(frame, 1)
-    # Convert frame to grayscale
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    if not ret:
+        break
 
-    # Detect faces in the grayscale frame
-    faces = detector(gray)
+    faces = detector(frame)
 
-    # Display the original frame if no faces are detected
-    if len(faces) == 0:
-        cv2.imshow("Face detection and alignment", frame)
-    else:
-        # Get the first face in the frame
-        face = faces[0]
+    for face in faces:
+        landmarks = predictor(frame, face)
+        landmarks = np.array(
+            [(landmarks.part(i).x, landmarks.part(i).y) for i in range(68)]
+        )
+        aligned_face = face_degree(frame, landmarks)
 
-        # Get the landmarks for the face in this frame
-        landmarks = predictor(gray, face)
+        # detect face on aligned frame
+        aligned_gray = cv2.cvtColor(aligned_face, cv2.IMREAD_COLOR)
+        aligned_faces = detector(aligned_face)
 
-        # Convert the landmarks to a NumPy array
-        landmarks = np.array([[p.x, p.y] for p in landmarks.parts()])
+        for aligned_face in aligned_faces:
+            x1 = aligned_face.left()
+            y1 = aligned_face.top()
+            x2 = aligned_face.right()
+            y2 = aligned_face.bottom()
 
-        # Draw the bounding box and landmarks for the detected face
-        for landmark in landmarks:
-            cv2.circle(frame, tuple(landmark), 2, (0, 255, 0), -1)
+            # draw rectangle around face
+            # cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 3)
 
-        # Calculate the rotation degree and rotate the image accouring to that
-        rotated_frame = face_degree(frame, landmarks)
+            # crop face from aligned frame
+            cropped_face = aligned_gray[y1:y2, x1:x2]
 
-        # Zoom into the face and display it in the window
-        x, y, w, h = face.left(), face.top(), face.width(), face.height()
-        zoomed_face = rotated_frame[y : y + h, x : x + w]
-        zoomed_face = cv2.resize(zoomed_face, (500, 500))
-        cv2.imshow("Face detection and alignment", zoomed_face)
+            # display cropped face
+            cv2.imshow("Cropped Face", cropped_face)
+            save_frame(cropped_face, "data/new_face")
 
-    # Exit the loop if 'q' is pressed
+    # display frame with detected faces
+    cv2.imshow("Face Detection", frame)
+
     if cv2.waitKey(1) == ord("q"):
         break
 
-# Release the webcam and destroy the window
 cap.release()
 cv2.destroyAllWindows()
