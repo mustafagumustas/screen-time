@@ -5,6 +5,9 @@ from PIL import Image
 import uuid
 import os
 import dlib
+from keras_preprocessing.image import img_to_array
+from keras.applications.resnet import preprocess_input
+
 
 # landmarks locations in their list
 # The mouth can be accessed through points [48, 68].
@@ -88,3 +91,24 @@ def save_frame(face, save_dir):
     save_path = save_dir + "/" + filename
     print(f"images saved to {save_path}")
     cv2.imwrite(save_path, face)
+
+
+def resize_img(directory):
+    # Iterate through the files in the directory
+    for filename in os.listdir(directory):
+        # Get the full file path
+        image_path = os.path.join(directory, filename)
+
+        # Check if the file is an image (you can modify this condition based on your file types)
+        if os.path.isfile(image_path) and filename.lower().endswith(
+            (".jpg", ".jpeg", ".png")
+        ):
+            # Read the cropped face image
+            cropped_face = cv2.imread(image_path)
+
+            # Perform the preprocessing steps as mentioned earlier
+            resized_face = cv2.resize(cropped_face, (224, 224))
+            resized_face = img_to_array(resized_face)
+            resized_face = np.expand_dims(resized_face, axis=0)
+            preprocessed_face = preprocess_input(resized_face)
+            return preprocessed_face
