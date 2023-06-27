@@ -14,7 +14,7 @@ from data_preprocessing import (
 import numpy as np
 
 # Load and prepare data
-images, labels = load_images_with_labels("data/new_face")
+images, labels = load_images_with_labels("data")
 print(f"Loaded {len(images)} images and {len(labels)} labels.")
 
 # Ensure images and labels have the same length
@@ -71,4 +71,4 @@ model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accur
 model.fit(
     train_images, train_labels, epochs=10, validation_data=(val_images, val_labels)
 )
-model.save("face_recognition_model_260623_3.h5")
+model.save("face_recognition_model.h5")
