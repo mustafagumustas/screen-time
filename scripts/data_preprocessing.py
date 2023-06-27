@@ -25,6 +25,7 @@ def load_images(directory: str) -> List[np.ndarray]:
         if image is None:
             print(f"Unable to read image: {filename}")
             continue
+        image = np.array(image, dtype=np.float32) / 255.0
         images.append(image)
     return images
 
@@ -71,7 +72,9 @@ def augment_images(images: List[np.ndarray]) -> List[np.ndarray]:
         image = tf.image.random_flip_up_down(image)
         image = tf.image.random_brightness(image, max_delta=0.3)
         image = tf.image.random_contrast(image, lower=0.7, upper=1.3)
-        image = image.numpy()
+        image = tf.image.random_saturation(image, lower=0.7, upper=1.3)
+        image = tf.image.random_hue(image, max_delta=0.2)
+        image = image.numpy()  # Convert the Tensor back to a numpy array
 
         augmented_images.append(image)
 
