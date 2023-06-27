@@ -23,14 +23,14 @@ pip install opencv-python tensorflow dlib numpy scikit-learn
 The program will display the output in real time, showing the detected faces, their assigned ID numbers, and their screen time.
 
 To train the model, you will need to provide at least 15 images of each person that the system should recognize. The face of each person should be visible in the images. Put these images in the data folder, in a subfolder named after each person. For example:
-/data
+```/data
     /mustafa
         img1.jpg
         img2.jpg
     /your_name
         img1.jpg
         img2.jpg
-
+```
 After preparing the images, simply run main.py:
 
 ```shell
