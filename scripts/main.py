@@ -1,6 +1,6 @@
 from keras.applications import MobileNetV2
 from keras.models import Model
-from keras.layers import Dense, GlobalAveragePooling2D
+from keras.layers import Dense, GlobalAveragePooling2D, Dropout
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
 from sklearn.preprocessing import LabelBinarizer
@@ -31,6 +31,8 @@ print(f"After augmentation, we have {len(images)} images and {len(labels)} label
 # Ensure images and labels have the same length
 assert len(images) == len(labels)
 
+# Determine the number of unique classes
+num_classes = len(np.unique(labels))
 print(f"Unique labels: {np.unique(labels)}")
 
 # Encoding labels
@@ -53,9 +55,8 @@ base_model = MobileNetV2(weights="imagenet", include_top=False)
 x = base_model.output  # Add a global spatial average pooling layer
 x = GlobalAveragePooling2D()(x)
 x = Dense(1024, activation="relu")(x)  # Add a fully-connected layer
-
-# Add a logistic layer -- we have 2 classes: "YourName" and "unknown"
-predictions = Dense(2, activation="softmax")(x)
+x = Dropout(0.5)(x)  # Add a dropout layer with a rate of 0.5
+predictions = Dense(num_classes, activation="softmax")(x)
 
 # This is the model we will train
 model = Model(inputs=base_model.input, outputs=predictions)
@@ -64,10 +65,10 @@ model = Model(inputs=base_model.input, outputs=predictions)
 # i.e. freeze all convolutional MobileNetV2 layers
 for layer in base_model.layers:
     layer.trainable = False
-model.summary()
-# # Compile the model
-# model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
-# model.fit(
-#     train_images, train_labels, epochs=10, validation_data=(val_images, val_labels)
-# )
-# model.save("face_recognition_model_230623.h5")
+
+# Compile the model
+model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+model.fit(
+    train_images, train_labels, epochs=10, validation_data=(val_images, val_labels)
+)
+model.save("face_recognition_model_260623_3.h5")
