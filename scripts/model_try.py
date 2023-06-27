@@ -14,7 +14,7 @@ def get_class_names(dir_path):
 
 
 # Directory containing your data
-data_dir = "data/new_face"  # change to the path of your data directory
+data_dir = "data"  # change to the path of your data directory
 
 # Load the trained model
 model = load_model("face_recognition_model_260623_3.h5")
