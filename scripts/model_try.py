@@ -10,6 +10,7 @@ from keras.applications.mobilenet_v2 import preprocess_input
 def get_class_names(dir_path):
     return sorted(
         [d for d in os.listdir(dir_path) if os.path.isdir(os.path.join(dir_path, d))]
+        + ["unknown"]
     )
 
 
@@ -17,7 +18,7 @@ def get_class_names(dir_path):
 data_dir = "data"  # change to the path of your data directory
 
 # Load the trained model
-model = load_model("face_recognition_model_260623_3.h5")
+model = load_model("face_recognition_model_9.h5")
 
 # Create a list of class names
 class_names = get_class_names(data_dir)
@@ -27,7 +28,7 @@ detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 
 # Set a confidence threshold
-confidence_threshold = 0.85
+confidence_threshold = 0.75
 
 # Open the webcam
 cap = cv2.VideoCapture(0)
@@ -68,15 +69,26 @@ while True:
             label_index = np.argmax(
                 preds[0]
             )  # get the index of the label with the highest probability
-            # Get the class name
+            # Get the class name and confidence score
             label = class_names[label_index]
+            confidence = max_prob
         else:
             label = "unknown"
+            confidence = (
+                max_prob  # You can set the confidence score for "unknown" class
+            )
 
-        # Draw a rectangle around the face and add the label
+        # Draw a rectangle around the face and add the label and confidence score
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        label_text = f"{label}{confidence:.2f}"
         cv2.putText(
-            frame, label, (x, y + h + 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2
+            frame,
+            label_text,
+            (x, y + h + 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 0, 255),
+            2,
         )
 
     # Display the resulting frame
@@ -85,7 +97,6 @@ while True:
     # If 'q' is pressed on the keyboard, exit this loop
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
-
 # Close the video feed
 cap.release()
 cv2.destroyAllWindows()
