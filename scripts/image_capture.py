@@ -14,6 +14,10 @@ dot_max_radius = 50  # Adjust this value based on your preference
 # Calculate the total number of frames for one full rotation to achieve at least 200 images
 num_frames_for_full_rotation = max_images_per_rotation // dot_speed
 
+face_detector = cv2.FaceDetectorYN_create(
+    "models/face_detection_yunet_2022mar.onnx", "", (0, 0)
+)
+
 
 def update_dot_and_capture():
     global dot_x, dot_y, dot_angle, dot_max_radius, counter
@@ -37,10 +41,19 @@ def save_image(frame):
     global counter
 
     # Save the captured image to the appropriate folder based on the counter
-    person_folder = "./person"
+    person_folder = "./data/miray"
     os.makedirs(person_folder, exist_ok=True)
     image_path = os.path.join(person_folder, f"person{counter + 1}.jpg")
-    cv2.imwrite(image_path, frame)
+    h, x, _ = frame.shape
+    face_detector.setInputSize((x, h))
+    _, faces = face_detector.detect(frame)
+    faces = faces if faces is not None else []
+    for face in faces:
+        if face is not []:
+            box = list(map(int, face[:4]))
+            cv2.imwrite(
+                image_path, frame[box[1] : box[1] + box[3], box[0] : box[0] + box[2]]
+            )
 
     # Update the counter and check if we reached the maximum number of images for one rotation
     counter += 1
