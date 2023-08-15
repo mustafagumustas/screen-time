@@ -10,7 +10,7 @@ dot_x, dot_y = 0, 0
 dot_angle = 0
 dot_speed = 2
 dot_max_radius = 50  # Adjust this value based on your preference
-
+person_name = input("enter your name:")
 # Calculate the total number of frames for one full rotation to achieve at least 200 images
 num_frames_for_full_rotation = max_images_per_rotation // dot_speed
 
@@ -41,9 +41,9 @@ def save_image(frame):
     global counter
 
     # Save the captured image to the appropriate folder based on the counter
-    person_folder = "./data/miray"
+    person_folder = f"./data/{person_name}"
     os.makedirs(person_folder, exist_ok=True)
-    image_path = os.path.join(person_folder, f"person{counter + 1}.jpg")
+    image_path = os.path.join(person_folder, f"{person_name}_{counter + 1}.jpg")
     h, x, _ = frame.shape
     face_detector.setInputSize((x, h))
     _, faces = face_detector.detect(frame)
@@ -96,7 +96,7 @@ def wait_for_user():
             (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
             1,
-            (0, 0, 255),
+            (255, 255, 255),
             2,
         )
 
