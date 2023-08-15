@@ -4,7 +4,6 @@ import dlib
 import numpy as np
 from PIL import Image
 from pillow_heif import register_heif_opener
-from keras.preprocessing.image import ImageDataGenerator
 from cv2 import FaceDetectorYN_create
 from tqdm import tqdm
 
@@ -41,7 +40,9 @@ def resize_image(image_path: str, target_size=(224, 224)) -> np.ndarray:
         return None
 
 
-def align_faces_in_directory(directory: str, yunet_model_path: str) -> tuple:
+def align_faces_in_directory(
+    directory: str, yunet_model_path: str, aligned_faces_dir: str
+) -> tuple:
     # Load the YUNET face detector model
     face_detector = FaceDetectorYN_create(yunet_model_path, "", (0, 0))
 
@@ -73,11 +74,25 @@ def align_faces_in_directory(directory: str, yunet_model_path: str) -> tuple:
         faces = faces if faces is not None else []
 
         if len(faces) > 0:
-            for face in faces:
+            for idx, face in enumerate(faces):
                 box = list(map(int, face[:4]))
                 aligned_face = image[box[1] : box[1] + box[3], box[0] : box[0] + box[2]]
+
+                # Save the aligned face to the aligned_faces_dir with a unique name
+                aligned_face_path = os.path.join(
+                    aligned_faces_dir, f"{filename[:-4]}_face_{idx}.jpg"
+                )
+                cv2.imwrite(aligned_face_path, aligned_face)
+
                 aligned_faces.append(aligned_face)
                 image_names.append(filename)
+
+            # Move the original image to another folder (optional)
+            original_image_path = os.path.join(directory, filename)
+            os.rename(
+                original_image_path,
+                os.path.join(directory, "original_images", filename),
+            )
         else:
             print(f"No faces found in image: {filename}")
             no_face_images.append(image)
@@ -88,38 +103,17 @@ def align_faces_in_directory(directory: str, yunet_model_path: str) -> tuple:
     return aligned_faces, image_names, no_face_images, no_face_image_names
 
 
-def augment_data(folder_path):
-    # Perform data augmentation and save the augmented images to the same folder
-    data_gen = ImageDataGenerator(
-        rotation_range=20,
-        width_shift_range=0.1,
-        height_shift_range=0.1,
-        shear_range=0.2,
-        zoom_range=0.2,
-        horizontal_flip=True,
-        fill_mode="nearest",
-    )
+def crop_and_save_faces(aligned_faces, image_names, save_dir):
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
 
-    image_paths = [os.path.join(folder_path, f) for f in os.listdir(folder_path)]
-    for image_path in image_paths:
-        img = cv2.imread(image_path)
-        if img is None:
-            print(f"Error reading image: {image_path}")
-            continue
+    for face, image_name in zip(aligned_faces, image_names):
+        face_save_path = os.path.join(
+            save_dir, f"{os.path.splitext(image_name)[0]}_face.jpg"
+        )
+        cv2.imwrite(face_save_path, face)
 
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = img.reshape((1,) + img.shape)  # Convert to 4D tensor
-        i = 0
-        for batch in data_gen.flow(
-            img,
-            batch_size=1,
-            save_to_dir=folder_path,
-            save_prefix="aug",
-            save_format="jpg",
-        ):
-            i += 1
-            if i >= 10:  # Generate 10 augmented images for each original image
-                break
+    print(f"{len(aligned_faces)} faces cropped and saved in {save_dir} directory.")
 
 
 if __name__ == "__main__":
@@ -130,7 +124,10 @@ if __name__ == "__main__":
         person_folder_path = os.path.join(data_folder, person_folder)
         if os.path.isdir(person_folder_path):
             # Align faces in the person's folder using YUNET
-            align_faces_in_directory(person_folder_path, yunet_model_path)
+            aligned_faces, image_names, _, _ = align_faces_in_directory(
+                person_folder_path, yunet_model_path
+            )
 
-            # Perform data augmentation on the aligned faces
-            augment_data(person_folder_path)
+            # Save the aligned faces in a separate directory
+            save_dir = os.path.join(data_folder, f"{person_folder}_cropped_faces")
+            crop_and_save_faces(aligned_faces, image_names, save_dir)
