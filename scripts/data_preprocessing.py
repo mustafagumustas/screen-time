@@ -1,12 +1,9 @@
 import os
 import cv2
-import dlib
 import numpy as np
 from PIL import Image
 from pillow_heif import register_heif_opener
-from keras.preprocessing.image import ImageDataGenerator
 from cv2 import FaceDetectorYN_create
-from tqdm import tqdm
 
 # Register HEIF opener for image conversion
 register_heif_opener()
