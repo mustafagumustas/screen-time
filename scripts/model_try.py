@@ -14,11 +14,11 @@ def get_class_names(dir_path):
     )
 
 
-# Directory containing your data
+# Directory containing your dat
 data_dir = "data"  # change to the path of your data directory
 
 # Load the trained model
-model = load_model("face_recognition_model_9.h5")
+model = load_model("face_recognition_model.h5")
 
 # Create a list of class names
 class_names = get_class_names(data_dir)
