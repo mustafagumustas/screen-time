@@ -4,6 +4,7 @@ import dlib
 import numpy as np
 from PIL import Image
 from pillow_heif import register_heif_opener
+from keras.preprocessing.image import ImageDataGenerator
 from cv2 import FaceDetectorYN_create
 from tqdm import tqdm
 
@@ -19,7 +20,6 @@ def convert_heic_to_jpg(filepath: str) -> np.ndarray:
         return jpg_path
     except Exception as e:
         print(f"Error converting {filepath} to JPG: {e}")
-        return None
 
 
 def resize_image(image_path: str, target_size=(224, 224)) -> np.ndarray:
@@ -40,9 +40,7 @@ def resize_image(image_path: str, target_size=(224, 224)) -> np.ndarray:
         return None
 
 
-def align_faces_in_directory(
-    directory: str, yunet_model_path: str, aligned_faces_dir: str
-) -> tuple:
+def align_faces_in_directory(directory: str, yunet_model_path: str) -> tuple:
     # Load the YUNET face detector model
     face_detector = FaceDetectorYN_create(yunet_model_path, "", (0, 0))
 
@@ -74,25 +72,11 @@ def align_faces_in_directory(
         faces = faces if faces is not None else []
 
         if len(faces) > 0:
-            for idx, face in enumerate(faces):
+            for face in faces:
                 box = list(map(int, face[:4]))
                 aligned_face = image[box[1] : box[1] + box[3], box[0] : box[0] + box[2]]
-
-                # Save the aligned face to the aligned_faces_dir with a unique name
-                aligned_face_path = os.path.join(
-                    aligned_faces_dir, f"{filename[:-4]}_face_{idx}.jpg"
-                )
-                cv2.imwrite(aligned_face_path, aligned_face)
-
                 aligned_faces.append(aligned_face)
                 image_names.append(filename)
-
-            # Move the original image to another folder (optional)
-            original_image_path = os.path.join(directory, filename)
-            os.rename(
-                original_image_path,
-                os.path.join(directory, "original_images", filename),
-            )
         else:
             print(f"No faces found in image: {filename}")
             no_face_images.append(image)
@@ -103,19 +87,6 @@ def align_faces_in_directory(
     return aligned_faces, image_names, no_face_images, no_face_image_names
 
 
-def crop_and_save_faces(aligned_faces, image_names, save_dir):
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-
-    for face, image_name in zip(aligned_faces, image_names):
-        face_save_path = os.path.join(
-            save_dir, f"{os.path.splitext(image_name)[0]}_face.jpg"
-        )
-        cv2.imwrite(face_save_path, face)
-
-    print(f"{len(aligned_faces)} faces cropped and saved in {save_dir} directory.")
-
-
 if __name__ == "__main__":
     data_folder = "data"
     yunet_model_path = "models/face_detection_yunet_2022mar.onnx"
@@ -124,10 +95,6 @@ if __name__ == "__main__":
         person_folder_path = os.path.join(data_folder, person_folder)
         if os.path.isdir(person_folder_path):
             # Align faces in the person's folder using YUNET
-            aligned_faces, image_names, _, _ = align_faces_in_directory(
+            aligned_faces, _, _, _ = align_faces_in_directory(
                 person_folder_path, yunet_model_path
             )
-
-            # Save the aligned faces in a separate directory
-            save_dir = os.path.join(data_folder, f"{person_folder}_cropped_faces")
-            crop_and_save_faces(aligned_faces, image_names, save_dir)
