@@ -1,34 +1,18 @@
-import os
 import cv2
 import dlib
 import numpy as np
 from keras.models import load_model
 from keras.applications.mobilenet_v2 import preprocess_input
 
-
-# Function to get class names
-def get_class_names(dir_path):
-    return sorted(
-        [d for d in os.listdir(dir_path) if os.path.isdir(os.path.join(dir_path, d))]
-        + ["unknown"]
-    )
-
-
-# Directory containing your dat
-data_dir = "data"  # change to the path of your data directory
-
 # Load the trained model
-model = load_model("face_recognition_model.h5")
-
-# Create a list of class names
-class_names = get_class_names(data_dir)
+model = load_model("face_recognition_model_300823.h5")
 
 # Initialize dlib's face detector and shape predictor
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 
 # Set a confidence threshold
-confidence_threshold = 0.75
+confidence_threshold = 0.70
 
 # Open the webcam
 cap = cv2.VideoCapture(0)
@@ -66,21 +50,24 @@ while True:
         max_prob = np.max(preds[0])
 
         if max_prob > confidence_threshold:
-            label_index = np.argmax(
-                preds[0]
-            )  # get the index of the label with the highest probability
-            # Get the class name and confidence score
-            label = class_names[label_index]
+            label_index = np.argmax(preds[0])
+            # Get the class name based on the index (you might need to adjust the index)
+            if label_index == 0:
+                label = "anil"
+            elif label_index == 1:
+                label = "miray"
+            elif label_index == 2:
+                label = "mustafa"
+            else:
+                label = "unknown"
             confidence = max_prob
         else:
             label = "unknown"
-            confidence = (
-                max_prob  # You can set the confidence score for "unknown" class
-            )
+            confidence = max_prob
 
         # Draw a rectangle around the face and add the label and confidence score
         cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        label_text = f"{label}{confidence:.2f}"
+        label_text = f"{label} {confidence:.2f}"
         cv2.putText(
             frame,
             label_text,
