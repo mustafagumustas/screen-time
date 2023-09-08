@@ -7,7 +7,7 @@ import os
 import dlib
 from keras_preprocessing.image import img_to_array
 from keras.applications.resnet import preprocess_input
-
+from cv2 import FaceDetectorYN_create
 
 # landmarks locations in their list
 # The mouth can be accessed through points [48, 68].
@@ -181,3 +181,40 @@ def process_images_in_folder(shape_predictor_path, image_folder_path):
     print(f"Total images processed: {total_images}")
     print(f"Images with no faces detected: {no_faces_images}")
     print(f"Images with multiple faces detected: {multiple_faces_images}")
+
+
+def convert_heic_to_jpg(filepath: str) -> np.ndarray:
+    try:
+        image = Image.open(filepath)
+        jpg_path = os.path.splitext(filepath)[0] + ".jpg"
+        image.save(jpg_path)
+        return jpg_path
+    except Exception as e:
+        print(f"Error converting {filepath} to JPG: {e}")
+
+
+def align_faces_in_image(image_path, yunet_model_path):
+    # Load the YUNET face detector model
+    face_detector = FaceDetectorYN_create(yunet_model_path, "", (0, 0))
+
+    aligned_faces = []
+    image_names = []
+
+    # Load the image
+    image = cv2.imread(image_path)
+
+    if image is not None:
+        # Detect faces using YUNET
+        height, width, _ = image.shape
+        face_detector.setInputSize((width, height))
+        _, faces = face_detector.detect(image)
+        faces = faces if faces is not None else []
+
+        if len(faces) > 0:
+            for face in faces:
+                box = list(map(int, face[:4]))
+                aligned_face = image[box[1] : box[1] + box[3], box[0] : box[0] + box[2]]
+                aligned_faces.append(aligned_face)
+                image_names.append("aligned_face")
+
+    return aligned_faces, image_names
