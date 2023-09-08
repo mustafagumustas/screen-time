@@ -8,6 +8,9 @@ import dlib
 from keras_preprocessing.image import img_to_array
 from keras.applications.resnet import preprocess_input
 from cv2 import FaceDetectorYN_create
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
+import sys
 
 # landmarks locations in their list
 # The mouth can be accessed through points [48, 68].
@@ -22,16 +25,6 @@ predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 
 
 def euclidean_distance(a, b):
-    """
-    Computes the Euclidean distance between two points.
-
-    Args:
-        a (tuple): First point (x, y).
-        b (tuple): Second point (x, y).
-
-    Returns:
-        float: Euclidean distance.
-    """
     x1, y1 = a
     x2, y2 = b
     return math.sqrt(((x2 - x1) * (x2 - x1)) + ((y2 - y1) * (y2 - y1)))
@@ -39,16 +32,6 @@ def euclidean_distance(a, b):
 
 # could be dlib.get_face_chips used instead
 def face_degree(frame, landmarks):
-    """
-    Performs face alignment by rotating the face image to a standardized pose.
-
-    Args:
-        frame (np.ndarray): Input face image.
-        landmarks (np.ndarray): Facial landmarks.
-
-    Returns:
-        np.ndarray: Aligned face image.
-    """
     right_eye = landmarks[42:48]
     left_eye = landmarks[36:42]
     nose = landmarks[27:35]
@@ -106,15 +89,6 @@ def save_frame(face: np.ndarray, save_dir: str) -> None:
 
 
 def resize_img(directory):
-    """
-    Resizes and preprocesses the cropped face images.
-
-    Args:
-        directory (str): Directory containing the face images.
-
-    Returns:
-        np.ndarray: Preprocessed face image.
-    """
     # Iterate through the files in the directory
     for filename in os.listdir(directory):
         # Get the full file path
@@ -218,3 +192,190 @@ def align_faces_in_image(image_path, yunet_model_path):
                 image_names.append("aligned_face")
 
     return aligned_faces, image_names
+
+
+class FaceDetector:
+    def __init__(self):
+        self.detector = dlib.get_frontal_face_detector()
+
+    def detect_faces(self, frame):
+        # Convert the frame to grayscale (dlib requires grayscale images)
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        # Detect faces in the grayscale frame
+        faces = self.detector(gray)
+
+        # Process the detected faces
+        detected_faces = []
+        for face in faces:
+            x1, y1, x2, y2 = face.left(), face.top(), face.right(), face.bottom()
+            detected_faces.append((x1, y1, x2, y2))
+
+        return detected_faces
+
+
+def print_progress(iteration, total, prefix="", suffix="", decimals=3, bar_length=100):
+    """
+    Call in a loop to create standard out progress bar
+    :param iteration: current iteration
+    :param total: total iterations
+    :param prefix: prefix string
+    :param suffix: suffix string
+    :param decimals: positive number of decimals in percent complete
+    :param bar_length: character length of bar
+    :return: None
+    """
+
+    format_str = "{0:." + str(decimals) + "f}"  # format the % done number string
+    percents = format_str.format(
+        100 * (iteration / float(total))
+    )  # calculate the % done
+    filled_length = int(
+        round(bar_length * iteration / float(total))
+    )  # calculate the filled bar length
+    bar = "#" * filled_length + "-" * (
+        bar_length - filled_length
+    )  # generate the bar string
+    sys.stdout.write(
+        "\r%s |%s| %s%s %s" % (prefix, bar, percents, "%", suffix)
+    ),  # write out the bar
+    sys.stdout.flush()  # flush to stdout
+
+
+def extract_frames(video_path, frames_dir, overwrite=False, start=-1, end=-1, every=1):
+    """
+    Extract frames from a video using OpenCVs VideoCapture
+    :param video_path: path of the video
+    :param frames_dir: the directory to save the frames
+    :param overwrite: to overwrite frames that already exist?
+    :param start: start frame
+    :param end: end frame
+    :param every: frame spacing
+    :return: count of images saved
+    """
+
+    video_path = os.path.normpath(video_path)  # make the paths OS (Windows) compatible
+    frames_dir = os.path.normpath(frames_dir)  # make the paths OS (Windows) compatible
+
+    video_dir, video_filename = os.path.split(
+        video_path
+    )  # get the video path and filename from the path
+
+    assert os.path.exists(video_path)  # assert the video file exists
+
+    capture = cv2.VideoCapture(video_path)  # open the video using OpenCV
+
+    if start < 0:  # if start isn't specified lets assume 0
+        start = 0
+    if end < 0:  # if end isn't specified assume the end of the video
+        end = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    capture.set(1, start)  # set the starting frame of the capture
+    frame = start  # keep track of which frame we are up to, starting from start
+    while_safety = 0  # a safety counter to ensure we don't enter an infinite while loop (hopefully we won't need it)
+    saved_count = 0  # a count of how many frames we have saved
+    detector = dlib.get_frontal_face_detector()
+    predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
+
+    while frame < end:  # loop through the frames
+        _, image = capture.read()  # read a frame from the video
+
+        if while_safety > 500:
+            break
+
+        if image is None:
+            while_safety += 1
+            continue
+
+        if frame % every == 0:
+            while_safety = 0
+            # Convert the frame to grayscale for face detection
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            # Detect faces in the frame
+            faces = detector(gray)
+
+            if len(faces) > 0:
+                save_path = os.path.join(
+                    frames_dir, video_filename, "{:010d}.jpg".format(frame)
+                )
+                if not os.path.exists(save_path) or overwrite:
+                    cv2.imwrite(save_path, image)
+                    saved_count += 1
+
+        frame += 1
+
+    capture.release()
+    return saved_count
+
+
+def video_to_frames(video_path, frames_dir, overwrite=False, every=1, chunk_size=1000):
+    """
+    Extracts the frames from a video using multiprocessing
+    :param video_path: path to the video
+    :param frames_dir: directory to save the frames
+    :param overwrite: overwrite frames if they exist?
+    :param every: extract every this many frames
+    :param chunk_size: how many frames to split into chunks (one chunk per cpu core process)
+    :return: path to the directory where the frames were saved, or None if fails
+    """
+
+    video_path = os.path.normpath(video_path)  # make the paths OS (Windows) compatible
+    frames_dir = os.path.normpath(frames_dir)  # make the paths OS (Windows) compatible
+
+    video_dir, video_filename = os.path.split(
+        video_path
+    )  # get the video path and filename from the path
+
+    # make directory to save frames, its a sub dir in the frames_dir with the video name
+    os.makedirs(os.path.join(frames_dir, video_filename), exist_ok=True)
+
+    capture = cv2.VideoCapture(video_path)  # load the video
+    total = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))  # get its total frame count
+    capture.release()  # release the capture straight away
+
+    if total < 1:  # if video has no frames, might be and opencv error
+        print("Video has no frames. Check your OpenCV + ffmpeg installation")
+        return None  # return None
+
+    frame_chunks = [
+        [i, i + chunk_size] for i in range(0, total, chunk_size)
+    ]  # split the frames into chunk lists
+    frame_chunks[-1][-1] = min(
+        frame_chunks[-1][-1], total - 1
+    )  # make sure last chunk has correct end frame, also handles case chunk_size < total
+
+    prefix_str = "Extracting frames from {}".format(
+        video_filename
+    )  # a prefix string to be printed in progress bar
+
+    # execute across multiple cpu cores to speed up processing, get the count automatically
+    with ProcessPoolExecutor(max_workers=multiprocessing.cpu_count()) as executor:
+        futures = [
+            executor.submit(
+                extract_frames, video_path, frames_dir, overwrite, f[0], f[1], every
+            )
+            for f in frame_chunks
+        ]  # submit the processes: extract_frames(...)
+
+        for i, f in enumerate(as_completed(futures)):  # as each process completes
+            print_progress(
+                i, len(frame_chunks) - 1, prefix=prefix_str, suffix="Complete"
+            )  # print it's progress
+
+    return os.path.join(
+        frames_dir, video_filename
+    )  # when done return the directory containing the frames
+
+
+# if __name__ == "__main__":
+#     # test it
+#     video_to_frames(
+#         video_path="data/face_finder.mp4",
+#         frames_dir="/Users/mustafagumustas/screen-time/data/detected_faces",
+#         overwrite=False,
+#         every=1,
+#         chunk_size=1000,
+#     )
+
+#     if sys.platform == "darwin":
+#         multiprocessing.set_start_method("spawn")
