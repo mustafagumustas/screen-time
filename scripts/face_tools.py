@@ -145,3 +145,39 @@ def reorder_images_under_folder(folder_path: str) -> None:
                 subfile_path,
                 os.path.join(folder_path, folder_path.split("/")[-1] + "_" + subfile),
             )
+
+
+def process_images_in_folder(shape_predictor_path, image_folder_path):
+    # Initialize the face detector and shape predictor
+    detector = dlib.get_frontal_face_detector()
+    predictor = dlib.shape_predictor(shape_predictor_path)
+
+    # Initialize counters
+    total_images = 0
+    no_faces_images = 0
+    multiple_faces_images = 0
+
+    # Iterate through all images in the folder
+    for filename in os.listdir(image_folder_path):
+        if filename.lower().endswith((".jpg", ".jpeg", ".png")):
+            total_images += 1
+            image_path = os.path.join(image_folder_path, filename)
+
+            # Load the image
+            image = dlib.load_rgb_image(image_path)
+
+            # Detect faces in the image
+            faces = detector(image)
+
+            if len(faces) == 0:
+                print(f"No faces detected in: {image_path}")
+                no_faces_images += 1
+            elif len(faces) > 1:
+                print(f"Multiple faces detected in: {image_path}")
+                multiple_faces_images += 1
+
+    # Print the report
+    print("------- Report -------")
+    print(f"Total images processed: {total_images}")
+    print(f"Images with no faces detected: {no_faces_images}")
+    print(f"Images with multiple faces detected: {multiple_faces_images}")
