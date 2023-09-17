@@ -235,12 +235,14 @@
 #   via the command:
 #       pip install numpy
 
+
 import sys
 import os
 import dlib
 import glob
 import random
 import concurrent.futures
+from multiprocessing import Process
 
 if len(sys.argv) != 5:
     print(
@@ -287,22 +289,7 @@ image_subsets = [
 ]
 
 
-def process_image(image_path):
-    img = dlib.load_rgb_image(image_path)
-    dets = detector(img, 1)
-    for k, d in enumerate(dets):
-        shape = sp(img, d)
-        face_descriptor = facerec.compute_face_descriptor(img, shape)
-        descriptors.append(face_descriptor)
-        images.append((img, shape))
-
-
-descriptors = []
-images = []
-
-# Process each subset separately
-for i, image_subset in enumerate(image_subsets):
-    print(f"Processing Subset {i + 1} of {num_subsets}")
+def process_image(image_subset, output_folder):
     descriptors = []
     images = []
 
@@ -326,7 +313,8 @@ for i, image_subset in enumerate(image_subsets):
     # Create a dictionary to store faces for each person
     face_clusters = {}
     for j in range(num_classes):
-        face_clusters[f"person_{j + 1}"] = []
+        person_key = f"person_{j + 1}"
+        face_clusters[person_key] = []
 
     # Group faces by person
     for j, label in enumerate(labels):
@@ -335,17 +323,29 @@ for i, image_subset in enumerate(image_subsets):
         face_clusters[person_key].append((img, shape))
 
     # Ensure the output directory exists for this subset
-    output_subset_folder = os.path.join(output_folder_path, f"section_{i + 1}")
-    if not os.path.isdir(output_subset_folder):
-        os.makedirs(output_subset_folder)
+    if not os.path.isdir(output_folder):
+        os.makedirs(output_folder)
 
     # Save the face clusters to output folder
     for person, faces in face_clusters.items():
         if len(faces) >= 100:  # Ignore clusters with fewer than 100 faces
-            person_folder = os.path.join(output_subset_folder, person)
+            person_folder = os.path.join(output_folder, person)
             if not os.path.isdir(person_folder):
                 os.makedirs(person_folder)
 
             for j, (img, shape) in enumerate(faces):
                 file_path = os.path.join(person_folder, f"face_{j}.jpg")
                 dlib.save_face_chip(img, shape, file_path, size=150, padding=0.25)
+
+
+if __name__ == "__main__":
+    processes = []
+
+    for i, image_subset in enumerate(image_subsets):
+        output_subset_folder = os.path.join(output_folder_path, f"section_{i + 1}")
+        p = Process(target=process_image, args=(image_subset, output_subset_folder))
+        processes.append(p)
+        p.start()
+
+    for p in processes:
+        p.join()
