@@ -128,6 +128,39 @@ def process_image(image_subset, output_folder):
                 dlib.save_face_chip(img, shape, file_path, size=150, padding=0.25)
 
 
+def calculate_percentage_in_cluster(cluster_folder):
+    # Initialize a dictionary to keep track of person counts
+    person_counts = {}
+
+    # Count the total number of faces in the cluster
+    total_faces = 0
+
+    for person_folder in os.listdir(cluster_folder):
+        if os.path.isdir(os.path.join(cluster_folder, person_folder)):
+            person_faces = len(os.listdir(os.path.join(cluster_folder, person_folder)))
+            person_counts[person_folder] = person_faces
+            total_faces += person_faces
+
+    # Calculate the percentage of appearance for each person
+    percentages = {}
+    highest_appearance = 0  # Corrected variable name
+    most_appeared_person = ""
+
+    for person, count in person_counts.items():
+        percentage = (count / total_faces) * 100
+        percentages[person] = percentage
+
+        if count > highest_appearance:
+            highest_appearance = count
+            most_appeared_person = person
+
+    # Print the percentages
+    for person, percentage in percentages.items():
+        print(f"{person}: {percentage:.2f}%")
+
+    print(f"Most appeared person: {most_appeared_person} ({highest_appearance} faces)")
+
+
 if __name__ == "__main__":
     start_time = time.time()
     video_path = "avrupayakasi.mp4"
@@ -159,6 +192,12 @@ if __name__ == "__main__":
 
     for p in processes:
         p.join()
+
+    # Print the percentages for each section
+    for section_folder in os.listdir(output_folder_path):
+        if os.path.isdir(os.path.join(output_folder_path, section_folder)):
+            section_path = os.path.join(output_folder_path, section_folder)
+            calculate_percentage_in_cluster(section_path)
 
     finish_time = time.time()
     print(f"Time taken: {finish_time - start_time:.2f} seconds")
