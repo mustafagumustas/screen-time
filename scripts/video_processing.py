@@ -6,7 +6,7 @@ from multiprocessing import Process
 import time
 import sys
 import concurrent.futures
-
+import cv2
 
 predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 detector = dlib.get_frontal_face_detector()
@@ -69,7 +69,7 @@ def generate_face_embeddings(face_image):
 
     image = cv2.resize(image, (150, 150))
     # Compute the face descriptor for the face chip
-    face_encoding = face_rec_model.compute_face_descriptor(image)
+    face_encoding = facerec.compute_face_descriptor(image)
 
     return face_encoding
 
@@ -118,7 +118,7 @@ def process_image(image_subset, output_folder):
 
     # Save the face clusters to output folder
     for person, faces in face_clusters.items():
-        if len(faces) >= 5:  # Ignore clusters with fewer than 100 faces
+        if len(faces) >= 10:  # Ignore clusters with fewer than 10 faces
             person_folder = os.path.join(output_folder, person)
             if not os.path.isdir(person_folder):
                 os.makedirs(person_folder)
@@ -130,12 +130,16 @@ def process_image(image_subset, output_folder):
 
 if __name__ == "__main__":
     start_time = time.time()
+    video_path = "avrupayakasi.mp4"
     faces_folder_path = "output_faces"
     output_folder_path = "output_clusters"
     max_images_per_subset = 2000
-
     max_images_to_process = 100
 
+    # Extract frames from the video
+    extract_frames(video_path, faces_folder_path)
+
+    # List all image paths in the faces folder
     all_image_paths = glob.glob(os.path.join(faces_folder_path, "*.jpg"))
 
     num_subsets = len(all_image_paths) // max_images_per_subset + 1
@@ -158,33 +162,3 @@ if __name__ == "__main__":
 
     finish_time = time.time()
     print(f"Time taken: {finish_time - start_time:.2f} seconds")
-
-# if __name__ == "__main__":
-#     video_path = "avrupayakasi.mp4"  # Replace with the path to your MP4 video
-#     output_directory = "output_faces"  # Replace with your desired output directory
-#     start_time = time.time()
-#     # extract_frames(video_path, output_directory)
-#     frames = [
-#         os.path.join(output_directory, frame) for frame in os.listdir(output_directory)
-#     ]
-#     faces_encodings = [generate_face_embeddings(i) for i in frames]
-#     # print(frames)
-#     # print(cluster_labels)
-#     # for i in set(cluster_labels):
-#     #     print("Cluster: ", i)
-#     #     cluster_dir = os.path.join(output_directory, f"Cluster_{i}")
-
-#     #     os.makedirs(cluster_dir, exist_ok=True)
-#     #     # get all the indexes of the same values from list
-#     #     indexes = [
-#     #         shutil.move(frames[j], cluster_dir)
-#     #         for j, x in enumerate(cluster_labels)
-#     #         if x == i
-#     #     ]
-#     end_time = time.time()
-#     print(f"Time taken: {end_time - start_time:.2f} seconds")
-
-
-# # we got the cluster, we do have two lists: one has the paths for the
-# # frames and the other is the index of the clustering. so we must be
-# # able to move the frames to the corresponding cluster folder.
