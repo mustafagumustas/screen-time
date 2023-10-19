@@ -2,11 +2,12 @@ import os
 import dlib
 import glob
 import random
-from multiprocessing import Process
+from multiprocessing import Process, Pool
 import time
 import sys
 import concurrent.futures
 import cv2
+from pytube import YouTube
 
 predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 detector = dlib.get_frontal_face_detector()
@@ -14,13 +15,11 @@ sp = dlib.shape_predictor("models/shape_predictor_5_face_landmarks.dat")
 facerec = dlib.face_recognition_model_v1(
     "models/dlib_face_recognition_resnet_model_v1.dat"
 )
-# example frmae
-# /Users/mustafagumustas/screen-time/output_faces/frame_0375.jpg
 
 
-def extract_frames(video_path, output_dir):
+def extract_frames(output_dir, video_url):
     # Open the video file
-    cap = cv2.VideoCapture(video_path)
+    cap = cv2.VideoCapture(video_url)
 
     # Check if the video file was successfully opened
     if not cap.isOpened():
@@ -53,7 +52,7 @@ def extract_frames(video_path, output_dir):
     # Release the video capture object
     cap.release()
 
-    print(f"Frames with faces extracted: {frame_count% 25}")
+    print(f"Frames with faces extracted: {frame_count % 25}")
     print(f"Frames with faces saved in: {output_dir}")
 
 
@@ -161,16 +160,38 @@ def calculate_percentage_in_cluster(cluster_folder):
     print(f"Most appeared person: {most_appeared_person} ({highest_appearance} faces)")
 
 
+def process_image_wrapper(args):
+    # Unpack the arguments and call process_image
+    image_subset, output_folder = args
+    process_image(image_subset, output_folder)
+
+
 if __name__ == "__main__":
     start_time = time.time()
-    video_path = "avrupayakasi.mp4"
-    faces_folder_path = "output_faces"
-    output_folder_path = "output_clusters"
-    max_images_per_subset = 2000
+
+    max_images_per_subset = 3000
     max_images_to_process = 100
 
+    # Get the YouTube URL from the last command-line argument
+    youtube_url = sys.argv[-1]
+
+    # Initialize a YouTube object
+    yt = YouTube(youtube_url)
+    video_stream = yt.streams.get_highest_resolution()
+
+    video_name = yt.title.replace(
+        " ", "_"
+    )  # Replace spaces with underscores in the video name
+    faces_folder_path = f"{video_name}"
+    output_folder_path = f"{video_name}"
+
+    cap = cv2.VideoCapture(video_stream.url)
+
+    frame_count = 0
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+
     # Extract frames from the video
-    extract_frames(video_path, faces_folder_path)
+    extract_frames(faces_folder_path, video_stream.url)
 
     # List all image paths in the faces folder
     all_image_paths = glob.glob(os.path.join(faces_folder_path, "*.jpg"))
@@ -182,16 +203,15 @@ if __name__ == "__main__":
         for i in range(0, len(all_image_paths), max_images_per_subset)
     ]
 
-    processes = []
-
-    for i, image_subset in enumerate(image_subsets):
-        output_subset_folder = os.path.join(output_folder_path, f"section_{i + 1}")
-        p = Process(target=process_image, args=(image_subset, output_subset_folder))
-        processes.append(p)
-        p.start()
-
-    for p in processes:
-        p.join()
+    # Create a Pool with a number of processes
+    num_processes = 4  # Adjust the number of processes as needed
+    with Pool(num_processes) as pool:
+        # Prepare the arguments as tuples
+        args = [
+            (image_subset, os.path.join(output_folder_path, f"section_{i + 1}"))
+            for i, image_subset in enumerate(image_subsets)
+        ]
+        pool.map(process_image_wrapper, args)
 
     # Print the percentages for each section
     for section_folder in os.listdir(output_folder_path):
