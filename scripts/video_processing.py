@@ -207,10 +207,7 @@ if __name__ == "__main__":
     num_processes = 4  # Adjust the number of processes as needed
     with Pool(num_processes) as pool:
         # Prepare the arguments as tuples
-        args = [
-            (image_subset, os.path.join(output_folder_path, f"section_{i + 1}"))
-            for i, image_subset in enumerate(image_subsets)
-        ]
+        args = [(image_subset, output_folder_path) for image_subset in image_subsets]
         pool.map(process_image_wrapper, args)
 
     # Print the percentages for each section
