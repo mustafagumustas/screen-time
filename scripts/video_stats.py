@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+import sjvisualizer
 
 
 def calculate_percentage_in_cluster(cluster_folder):
@@ -37,97 +38,42 @@ def calculate_percentage_in_series(serie_folder):
     return episodes
 
 
-# Example usage
-serie_folder_path = "avrupa_yakasi_folder"
+serie_folder_path = "/Users/mustafagumustas/screen-time/data"
 episode_data = calculate_percentage_in_series(serie_folder_path)
-
 # Create a DataFrame from the episode data
-df = pd.DataFrame(episode_data)
+df = pd.DataFrame([episode_data]).T
+df = df.fillna(0)
 
-# Extract episode numbers from the Episode column
-df["Episode Number"] = df["Episode"].str.extract(r"e(\d+)").astype(int)
-df = df.sort_values(by="Episode Number")
-# print(df)
+df = df.rename(columns={0: "Percentages"})
+
+
+df["Episodes"] = df["Percentages"].apply(
+    lambda x: " ".join(
+        [f"{k} {v.split('_')[-1]}" for k, v in x.items() if k == "Episode"]
+    )
+)
+# df = df.apply(
+#     lambda row: {key: value for key, value in row.items() if key != "Episode"}, axis=1
+# )
+df["Percentages"] = df["Percentages"].apply(
+    lambda x: {k: v for k, v in x.items() if k != "Episode"}
+)
 
 # Get a list of unique persons
 persons = list(
-    set(person for person in df.columns if person not in ["Episode", "Episode Number"])
+    set(person for person in df.columns if person not in ["Episode", "Episodes"])
 )
-
-
-def plot_percentage_for_names_all_episodes(episode_data, names):
-    # Create a DataFrame from the episode data
-    df = pd.DataFrame(episode_data)
-
-    # Extract episode numbers from the Episode column
-    df["Episode Number"] = df["Episode"].str.extract(r"e(\d+)").astype(int)
-    df = df.sort_values(by="Episode Number")
-
-    plt.figure(figsize=(12, 6))
-    ax = plt.subplot(111)
-
-    for name in names:
-        data = df[["Episode", name, "Episode Number"]].sort_values(by="Episode Number")
-        ax.bar(
-            df["Episode Number"] + 0.2 * names.index(name),
-            data[name],
-            width=0.2,
-            label=name,
-        )
-
-    plt.title("Percentage of Appearance for Selected Names in Each Episode")
-    plt.xlabel("Episode Number")
-    plt.ylabel("Percentage of Appearance")
-    plt.legend()
-    plt.xticks(df["Episode Number"], rotation=45)
-    plt.show()
-
-
-# plot_percentage_for_names_all_episodes(df, ["cem", "sehsuvar", "asli"])
-
-
-def get_data_for_episode(episode_data, episode_number):
-    # Create a DataFrame from the episode data
-    df = pd.DataFrame(episode_data)
-
-    # Extract episode numbers from the Episode column
-    df["Episode Number"] = df["Episode"].str.extract(r"e(\d+)").astype(int)
-
-    # Filter the DataFrame for the specified episode number
-    episode_df = df[df["Episode Number"] == episode_number]
-
-    return episode_df
-
-
-# print(df[df["Episode Number"] == 2])
-
-# plot_percentage_for_names_all_episodes(
-#     get_data_for_episode(df, 1),
-#     [
-#         "fatos",
-#         "sehsuvar",
-#         "iffet",
-#         "yaprak",
-#         "volkan",
-#         "selin",
-#         "tahsin",
-#         "cem",
-#         "asli",
-#         "tacettin",
-#         "sertac",
-#     ],
-# )
 
 
 # Step 2: Prepare Data for Visualization
 # This step depends on how you want to structure your data. You might want to create lists or dictionaries.
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+import ast
+from scipy.interpolate import interp1d
 
-
-data = pd.read_csv("episode_percentages.csv")
-data["Episode Number"] = data["Episode"].str.extract(r"e(\d+)").astype(int)
-data = data.sort_values(by="Episode Number")
-# Convert the 'Percentages' column to dictionaries with float values
-data["Percentages"] = data["Percentages"].apply(lambda x: ast.literal_eval(x))
+data = df
 
 # Ensure all values in the 'Percentages' column are dictionaries with float values
 data["Percentages"] = data["Percentages"].apply(
@@ -138,26 +84,40 @@ data["Percentages"] = data["Percentages"].apply(
 data["Percentages"] = data["Percentages"].apply(
     lambda x: dict(sorted(x.items(), key=lambda item: item[1], reverse=True))
 )
-print(data)
 
-
-# Step 3: Create the Animated Plot
-# You'll need to create a function that updates the plot for each episode.
-# Use FuncAnimation to iterate over episodes and update the plot.
+# Create a figure and subplots
 fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(12, 6))
 
-how_many_people_to_show = 8
+data["Episodes"] = data["Episodes"].apply(lambda x: x.split()[-1]).astype(int)
+
+# Sort the DataFrame based on the converted "Episodes" column
+data = data.sort_values(by="Episodes").reset_index().drop(columns="index")
+print(data)
+
+# Initialize data for interpolation
+current_data = data.iloc[0]
+next_data = data.iloc[1]
 
 
 # Function to update the animated plot
 def animate(i):
-    episode_data = data.iloc[i]
+    global current_data, next_data
+
+    if i < len(data) - 1:
+        current_data = data.iloc[i]
+        next_data = data.iloc[i + 1]
+
+    # Interpolate between current and next data
+    interp_data = {}
+    for player, percentage in current_data["Percentages"].items():
+        interp_percentage = interp1d(
+            [0, 1], [percentage, next_data["Percentages"].get(player, 0)]
+        )(i % 1)
+        interp_data[player] = interp_percentage
 
     # Get the top 5 visible players for the left graph
     top_players_left = dict(
-        sorted(
-            episode_data["Percentages"].items(), key=lambda item: item[1], reverse=True
-        )[:how_many_people_to_show]
+        sorted(interp_data.items(), key=lambda item: item[1], reverse=True)[:5]
     )
 
     # Get the cumulative top 5 players for the right graph
@@ -169,9 +129,7 @@ def animate(i):
             else:
                 top_players_right[player] = percentage
     top_players_right = dict(
-        sorted(top_players_right.items(), key=lambda item: item[1], reverse=True)[
-            :how_many_people_to_show
-        ]
+        sorted(top_players_right.items(), key=lambda item: item[1], reverse=True)[:5]
     )
 
     # Sort the players by most visited for both left and right graphs
@@ -186,7 +144,7 @@ def animate(i):
 
     # Plot the left graph
     ax_left.barh(list(top_players_left.keys()), top_players_left.values(), color="blue")
-    ax_left.set_title(f'Top 5 Visible Players in {episode_data["Episode"]}')
+    ax_left.set_title(f'Top 5 Visible Players in {current_data["Episodes"]}')
 
     # Plot the right graph
     ax_right.barh(
@@ -195,10 +153,31 @@ def animate(i):
     ax_right.set_title(f"Top 5 Players in the Season So Far")
 
 
+# new_data = (
+#     pd.DataFrame(data["Percentages"].to_list(), index=data["Episodes"])
+#     .fillna(0)
+#     .reset_index()
+# )
+
+# Sort the new_data DataFrame based on the "Episodes" column
+
+
+# Split the elements in the "Episodes" column and convert the last term to an integer
+# new_data["Episodes"] = new_data["Episodes"].apply(lambda x: x.split()[-1]).astype(int)
+
+# # Sort the DataFrame based on the converted "Episodes" column
+# new_data = new_data.sort_values(by="Episodes").reset_index().drop(columns="index")
+
+# Save the transformed data to a new CSV file
+# new_data["Episode"] = new_data["Episode"] + 1
+# new_data.to_excel("transformed_data.xlsx", index=False)
+# new_data.to_csv("transformed_data.csv", index=False)
+
+
 # Create the animation
 ani = FuncAnimation(
-    fig, animate, frames=len(data), repeat=False, interval=500
-)  # Set interval to control animation speed
+    fig, animate, frames=len(data), repeat=False, interval=300
+)  # Adjust interval for smoother animation
 
 # Show the animated plot
 plt.show()
