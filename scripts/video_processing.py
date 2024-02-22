@@ -9,15 +9,11 @@ import concurrent.futures
 import cv2
 from pytube import YouTube
 
-predictor = dlib.shape_predictor(
-    "/Users/mustafagumustas/screen-time/models/shape_predictor_68_face_landmarks.dat"
-)
+predictor = dlib.shape_predictor("models/shape_predictor_68_face_landmarks.dat")
 detector = dlib.get_frontal_face_detector()
-sp = dlib.shape_predictor(
-    "/Users/mustafagumustas/screen-time/models/shape_predictor_5_face_landmarks.dat"
-)
+sp = dlib.shape_predictor("models/shape_predictor_5_face_landmarks.dat")
 facerec = dlib.face_recognition_model_v1(
-    "/Users/mustafagumustas/screen-time/models/dlib_face_recognition_resnet_model_v1.dat"
+    "models/dlib_face_recognition_resnet_model_v1.dat"
 )
 
 

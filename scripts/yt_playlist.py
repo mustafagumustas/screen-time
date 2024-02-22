@@ -15,13 +15,10 @@ p = Playlist(playlist_url)
 for url in p.video_urls:
     yt = YouTube(url)
     print(yt.title)
-    if int((yt.title.split())[5].split(".")[0]) > 2:
-        print(yt.title)
-        print(url)
-        subprocess.run(
-            [
-                "python",
-                "scripts/video_processing.py",
-                url,
-            ]
-        )
+    subprocess.run(
+        [
+            "python",
+            "scripts/video_processing.py",
+            url,
+        ]
+    )
