@@ -38,7 +38,23 @@ def calculate_percentage_in_series(serie_folder):
     return episodes
 
 
-serie_folder_path = "/Users/mustafagumustas/screen-time/data"
+serie_folder_path = "/Users/mustafagumustas/screen-time/beta"
+
+
+def rename_folders(serie_folder_path):
+    episode_count = 1
+
+    for folder in os.listdir(serie_folder_path):
+        if os.path.isdir(os.path.join(serie_folder_path, folder)):
+            new_folder_name = f"episode_{episode_count}"
+            os.rename(
+                os.path.join(serie_folder_path, folder),
+                os.path.join(serie_folder_path, new_folder_name),
+            )
+            episode_count += 1
+
+
+rename_folders(serie_folder_path)
 episode_data = calculate_percentage_in_series(serie_folder_path)
 # Create a DataFrame from the episode data
 df = pd.DataFrame([episode_data]).T

@@ -15,7 +15,9 @@ person_name = input("enter your name:")
 num_frames_for_full_rotation = max_images_per_rotation // dot_speed
 
 face_detector = cv2.FaceDetectorYN_create(
-    "models/face_detection_yunet_2022mar.onnx", "", (0, 0)
+    "/Users/mustafagumustas/screen-time/models/face_detection_yunet_2022mar.onnx",
+    "",
+    (0, 0),
 )
 
 

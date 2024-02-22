@@ -5,7 +5,7 @@ from keras.models import load_model
 from keras.applications.mobilenet_v2 import preprocess_input
 
 # Load the trained model
-model = load_model("face_recognition_model_300823.h5")
+model = load_model("/Users/mustafagumustas/screen-time/anil_must_v1.h5")
 
 # Initialize dlib's face detector and shape predictor
 detector = dlib.get_frontal_face_detector()
@@ -55,8 +55,6 @@ while True:
             if label_index == 0:
                 label = "anil"
             elif label_index == 1:
-                label = "miray"
-            elif label_index == 2:
                 label = "mustafa"
             else:
                 label = "unknown"
