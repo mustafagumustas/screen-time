@@ -18,7 +18,7 @@ for url in p.video_urls:
     subprocess.run(
         [
             "python",
-            "screen-time/scripts/video_processing.py",
+            "scripts/video_processing.py",
             url,
         ]
     )
